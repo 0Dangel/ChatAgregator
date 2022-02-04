@@ -1,0 +1,213 @@
+from ast import arg
+from distutils import command
+from email import message
+import imp
+
+import json
+from logging import handlers
+from msilib.schema import Class
+from posixpath import dirname
+from threading import Thread
+from urllib import request
+from xml.etree.ElementInclude import include
+#from aiohttp import worker
+from async_timeout import asyncio
+from tornado.ioloop import IOLoop
+import tornado
+import sqlite3
+from os import path
+
+
+
+import requests
+import pytchat
+from pytchat import LiveChat
+import json
+import twitchAPI
+import tornado.ioloop
+import tornado.web
+import websockets
+import asyncio
+
+
+from os.path import dirname
+
+from tornado.web import StaticFileHandler
+
+from tornado.websocket import WebSocketHandler
+
+
+
+tornado.ioloop.IOLoop.configure("tornado.platform.asyncio.AsyncIOLoop")
+io_loop = tornado.ioloop.IOLoop.current()
+asyncio.set_event_loop(io_loop.asyncio_loop)
+
+#ws_clients = []
+
+
+class WebServer(tornado.web.Application):
+   
+    iol = IOLoop.current()
+    tohle = ""
+    ws_clients = []
+    
+    def __init__(self):
+        
+        global tohle
+        tohle = self
+        handlers = [
+             (r"/", MainHandler),
+             (r"/websocket",WSHandler,{"app":self}),
+             (r'/(.*.js)', StaticFileHandler, {'path': dirname(__file__)}),
+             (r'/auth',AuthHandler,)
+             ]
+        settings = {'debug':True}
+        self.listen(8080)
+        tornado.web.Application.__init__(self,handlers, **settings)
+        
+
+
+
+
+        
+    def send_ws_message(self, message):
+        for client in self.ws_clients:
+            try:
+                iol.spawn_callback(client.write_message, message)
+            except:
+                iol.spawn_callback(client.write_message, json.dumps(message))
+
+        #for client in self.ws_clients:
+         #   try:
+          #      self.iol.spawn_callback(client.write_message, message)
+           # except:
+            #    self.iol.spawn_callback(client.write_message, json.dumps(message))
+        
+        #tohle.write_message("message")
+        #print("yes")
+        print(len(self.ws_clients))
+
+
+
+#def bcint(message):
+    #print("-------")
+ #   print(len(ws_clients))
+  #  for client in ws_clients:
+   #     client.write_message(message)
+ #       print(message)
+#
+#def Broadcast(message):
+#    io_loop.asyncio_loop.call_soon_threadsafe(bcint,message)
+
+class AuthHandler():
+    def on_message(self,msg):
+        print(msg)
+
+
+class MainHandler(tornado.web.RequestHandler):
+    def get(self):
+        #self.write("Hello, world")
+        self.render("main.html")
+
+class WSHandler(WebSocketHandler):
+
+    def initialize(self, app):
+        self.app = app
+        self.app.ws_clients.append(self)
+
+    def open(self):
+        print('Webserver: Websocket opened.')
+        self.write_message('Server ready.')
+        #self.app.send_ws_message(message="This doesn't work")
+        #self.application.ws_clients.append(self)
+
+    def on_message(self, msg):
+        print('Webserver: Received WS message:', msg)
+
+    def on_close(self):
+        self.application.ws_clients.remove(self)
+        print('Webserver: Websocket client closed. Connected clients:', len(self.application.ws_clients))
+
+
+class YT_Chat():
+    
+    chat = ""
+    DB_Sqlite = ""
+    db_File_name = "viewers.sqlite"
+
+
+    def  __init__(self,vidID):
+        self.chat = pytchat.create(video_id=vidID)
+        #message(json.loads(self.chat.get().json()))
+        chat = self.chat.get()
+        #self.chat.get().
+
+        #if(not path.exists(self.db_File_name)):
+        #   self.DB_Sqlite= sqlite3.connect(self.db_File_name)
+        #   self.DB_Sqlite.execute()
+
+
+        #if(not self.DB_Sqlite):
+        #    self.DB_Sqlite = sqlite3.connect(self.db_File_name)
+
+
+    def main_function(self):
+                
+        print("After Server")
+        try:
+            while(True):
+                data = self.chat.get()
+                for c in data.sync_items():
+                    jsonized =json.loads( c.json())
+                    #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
+                    if(str(jsonized["message"]).startswith("!") ):
+                        command(jsonized["author"]["name"], jsonized["message"])
+                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":jsonized["author"]["name"],"zprava": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+
+                    #ws.send_ws_message(message=c.json())
+        except:
+            return("I failed")
+
+    def command(user: str,message: str) -> None:
+        return
+
+
+
+#"{\"author\": {\"badgeUrl\": \"\", \"type\": \"\", \"isVerified\": false, \"isChatOwner\": false, \"isChatSponsor\": false, \"isChatModerator\": false, \"channelId\": \"UCWld8VohnjT0TLxhNcVelkQ\", \"channelUrl\": \"http://www.youtube.com/channel/UCWld8VohnjT0TLxhNcVelkQ\", \"name\": \"ABCD\", \"imageUrl\": \"https://yt4.ggpht.com/ytc/AKedOLRvlvZKIkRXFbUzy8eM-SJjJ97gl2bUoYCgUhNIOOukc02hYoVfQh8WiQO5Rsu9=s64-c-k-c0x00ffffff-no-rj\"}, \"type\": \"textMessage\", \"id\": \"CkUKGkNJSElnZnVRel9VQ0ZTTU1mUW9kcTNNTVZREidDTG5DaVphUXpfVUNGV1NBNWdvZF9QOEc0dzE2NDMxOTAzMTg3MTI%3D\", \"timestamp\": 1643190320915, \"elapsedTime\": \"\", \"datetime\": \"2022-01-26 10:45:20\", \"message\": \"@Alam Khan :thinking_face:India pasand nhi to Pakistan jao:thumbs_up: Afghanistan jao,, koi nhi rok raha:smiling_face_with_sunglasses:\", \"messageEx\": [\"@Alam Khan \", {\"id\": \"🤔\", \"txt\": \":thinking_face:\", \"url\": \"https://www.youtube.com/s/gaming/emoji/828cb648/emoji_u1f914.svg\"}, \"India pasand nhi to Pakistan jao\", {\"id\": \"👍\", \"txt\": \":thumbs_up:\", \"url\": \"https://www.youtube.com/s/gaming/emoji/828cb648/emoji_u1f44d.svg\"}, \" Afghanistan jao,, koi nhi rok raha\", {\"id\": \"😎\", \"txt\": \":smiling_face_with_sunglasses:\", \"url\": \"https://www.youtube.com/s/gaming/emoji/828cb648/emoji_u1f60e.svg\"}], \"amountValue\": 0.0, \"amountString\": \"\", \"currency\": \"\", \"bgColor\": 0}"
+
+
+def start_server():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    ws.run()
+
+#worker.broadcast = Broadcast
+ 
+if __name__ == "__main__":
+    ws = WebServer()
+    #t = Thread(target = start_server,args=())
+    #t.start()
+    settingFile = ""
+    with open("settings.json") as file :        
+        try:
+            settingFile = json.loads(file)
+        except:
+            print("Unexpected error occured, 'Chat Agregator' has been terminated")
+            exit()    
+
+    video_id = settingFile["ytVideo"]
+    reader = YT_Chat(vidID= video_id)
+
+    t = Thread(target=reader.main_function,daemon=True)
+    t.start()
+  
+ 
+    iol = IOLoop.current()
+    iol.start()
+            #t.app.send_ws_message(message="Nope")
+            #
+            #ws.application.send_message("Prdel")
+            #ws.send_ws_message("prdel")
+            #print(jsonized)
+
+    print("Sem bych se dostat neměl")
+    t.join()
