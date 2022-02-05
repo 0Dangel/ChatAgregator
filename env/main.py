@@ -2,13 +2,13 @@ from ast import arg
 from datetime import datetime
 from distutils import command
 from email import message
-
+import time
 
 import json
 from logging import exception, handlers
 from msilib.schema import Class
 from posixpath import dirname
-import this
+
 from threading import Thread
 from urllib import request
 
@@ -21,7 +21,6 @@ from os import path
 
 
 
-import requests
 import pytchat
 from pytchat import LiveChat
 import json
@@ -134,10 +133,9 @@ class WSHandler(WebSocketHandler):
 class YT_Chat():
     #So far only for YT Chat - TODO: Add a Twitch implementation too - Preferably using same way as PytChat uses for YouTube ?(Screw Twitch API)?
     
-    chat = ""
-    DB_Sqlite = ""
-    db_File_name = "viewers_temp.sqlite"
-    viewers = {}
+    chat = None
+
+    
 
 
     def  __init__(self,vidID):
@@ -146,46 +144,58 @@ class YT_Chat():
         chat = self.chat.get()
         #self.chat.get().
 
-        if(not path.exists(self.db_File_name)):
-           self.DB_Sqlite= sqlite3.connect(self.db_File_name)
-           self.DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	STRING NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT 'DATE(''now'')',	PRIMARY KEY(\"id\")               )")
-
-
-        if(not self.DB_Sqlite):
-            self.DB_Sqlite = sqlite3.connect(self.db_File_name)
+        
 
 
     def main_function(self):
-                
+
+        DB_Sqlite = None
+        db_File_name = "viewers_temp.sqlite"
+        viewers = {}
+
+        if(not path.exists(db_File_name)):
+           DB_Sqlite= sqlite3.connect(db_File_name)
+           DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	STRING NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT CURRENT_TIMESTAMP,	PRIMARY KEY(\"id\")               )")
+
+
+        if(not DB_Sqlite):
+            DB_Sqlite = sqlite3.connect(db_File_name)
+
+
         print("After Server")
-        try:
-            SQL_Queue = []
-            last_DB_update = datetime.now()
-            while(True):
-                data = self.chat.get()
-                for c in data.sync_items():
-                    jsonized =json.loads( c.json())
-                    #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
-                    userID = jsonized["author"]["channelId"]
-                    user_name = jsonized["author"]["name"]
-                    if(str(jsonized["message"]).startswith("!") ):
-                        command(jsonized["author"]["name"], jsonized["message"])
-                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
-                    #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
-                    if(userID not in self.viewers):
-                        self.viewers[userID] = True
-                        #Might be good to implement some kind of multiplier for Members ? - TODO
-                        SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
-                        SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+jsonized["amountValue"]+"  where ID = \""+userID+"\";")   
-                        #TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
-                    else:
-                        SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+jsonized["amountValue"]+"  where ID = \""+userID+"\";")    
-                if((datetime.now() - last_DB_update) >= 300 ):
-                    for i in self.viewers:
-                        SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
-                    self.DB_Sqlite.executemany(SQL_Queue)
-                    SQL_Queue.clear()
-                    last_DB_update = datetime.now()
+       # try:
+        SQL_Queue = []
+        SQL_Queue.append("BEGIN TRANSACTION;")
+        last_DB_update = time.time()
+        while(True):
+            data = self.chat.get()
+            for c in data.sync_items():
+                jsonized =json.loads( c.json())
+                #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
+                userID = jsonized["author"]["channelId"]
+                user_name = jsonized["author"]["name"]
+                if(str(jsonized["message"]).startswith("!") ):
+                    command(user_name, jsonized["message"])
+                ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+                #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
+                if(userID not in viewers):
+                    viewers[userID] = True
+                    #Might be good to implement some kind of multiplier for Members ? - TODO
+                    SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
+                    SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")   
+                    #TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
+                else:
+                    SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")    
+            if((time.time() - last_DB_update) >= 10 ):
+                for i in viewers:
+                    SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
+                SQL_Queue.append("COMMIT;")
+
+                if(len(SQL_Queue) > 2):
+                    DB_Sqlite.executescript(" ".join(SQL_Queue))
+                SQL_Queue.clear()
+                SQL_Queue.append("BEGIN TRANSACTION;")
+                last_DB_update = time.time()
 
 
 
@@ -199,8 +209,8 @@ class YT_Chat():
                     #insert or ignore into viewers (ID,Name)VALUES ("UCQ5M_FnD7NpuLc3e5zjlBkg","ALT");
                     #update or IGNORE viewers set Message_count = Message_count +1, Name = "+jsonized["author"]["name"]+", Stream_count = Stream_count+1 where ID = jsonized["author"]["channelId"]
 
-        except:
-            return("I failed")
+        #except:
+         #   return("I failed")
 
     def command(user: str,message: str) -> None:
         return
