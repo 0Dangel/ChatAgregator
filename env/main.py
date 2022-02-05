@@ -133,9 +133,7 @@ class WSHandler(WebSocketHandler):
 class YT_Chat():
     #So far only for YT Chat - TODO: Add a Twitch implementation too - Preferably using same way as PytChat uses for YouTube ?(Screw Twitch API)?
     
-    chat = None
-
-    
+    chat = None   
 
 
     def  __init__(self,vidID):
@@ -197,18 +195,6 @@ class YT_Chat():
                 SQL_Queue.append("BEGIN TRANSACTION;")
                 last_DB_update = time.time()
 
-
-
-                    # Here goes SQL update or ignore
-
-                    #if(self.viewers[jsonized["author"]["channelId"]]):
-                     #   print("jkek")
-                    #self.DB_Sqlite.execute()
-                    #ws.send_ws_message(message=c.json())
-                    #SQL Commands to use:
-                    #insert or ignore into viewers (ID,Name)VALUES ("UCQ5M_FnD7NpuLc3e5zjlBkg","ALT");
-                    #update or IGNORE viewers set Message_count = Message_count +1, Name = "+jsonized["author"]["name"]+", Stream_count = Stream_count+1 where ID = jsonized["author"]["channelId"]
-
         #except:
          #   return("I failed")
 
@@ -249,11 +235,7 @@ if __name__ == "__main__":
  
     iol = IOLoop.current()
     iol.start()
-            #t.app.send_ws_message(message="Nope")
-            #
-            #ws.application.send_message("Prdel")
-            #ws.send_ws_message("prdel")
-            #print(jsonized)
+
 
     print("Err: How did I get here?!")
     t.join()
