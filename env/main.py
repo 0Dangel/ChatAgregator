@@ -1,4 +1,5 @@
 from ast import arg
+from datetime import datetime
 from distutils import command
 from email import message
 
@@ -131,11 +132,12 @@ class WSHandler(WebSocketHandler):
 
 
 class YT_Chat():
+    #So far only for YT Chat - TODO: Add a Twitch implementation too - Preferably using same way as PytChat uses for YouTube ?(Screw Twitch API)?
     
     chat = ""
     DB_Sqlite = ""
     db_File_name = "viewers_temp.sqlite"
-    viewers = ()
+    viewers = {}
 
 
     def  __init__(self,vidID):
@@ -146,7 +148,7 @@ class YT_Chat():
 
         if(not path.exists(self.db_File_name)):
            self.DB_Sqlite= sqlite3.connect(self.db_File_name)
-           self.DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	INTEGER NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT 'DATE(''now'')',	PRIMARY KEY(\"id\")               )")
+           self.DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	STRING NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT 'DATE(''now'')',	PRIMARY KEY(\"id\")               )")
 
 
         if(not self.DB_Sqlite):
@@ -157,14 +159,38 @@ class YT_Chat():
                 
         print("After Server")
         try:
+            SQL_Queue = []
+            last_DB_update = datetime.now()
             while(True):
                 data = self.chat.get()
                 for c in data.sync_items():
                     jsonized =json.loads( c.json())
                     #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
+                    userID = jsonized["author"]["channelId"]
+                    user_name = jsonized["author"]["name"]
                     if(str(jsonized["message"]).startswith("!") ):
                         command(jsonized["author"]["name"], jsonized["message"])
-                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":jsonized["author"]["name"],"userID":jsonized["author"]["channelId"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+                    #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
+                    if(userID not in self.viewers):
+                        self.viewers[userID] = True
+                        #Might be good to implement some kind of multiplier for Members ? - TODO
+                        SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
+                        SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+jsonized["amountValue"]+"  where ID = \""+userID+"\";")   
+                        #TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
+                    else:
+                        SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+jsonized["amountValue"]+"  where ID = \""+userID+"\";")    
+                if((datetime.now() - last_DB_update) >= 300 ):
+                    for i in self.viewers:
+                        SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
+                    self.DB_Sqlite.executemany(SQL_Queue)
+                    SQL_Queue.clear()
+                    last_DB_update = datetime.now()
+
+
+
+                    # Here goes SQL update or ignore
+
                     #if(self.viewers[jsonized["author"]["channelId"]]):
                      #   print("jkek")
                     #self.DB_Sqlite.execute()
