@@ -1,15 +1,16 @@
 from ast import arg
 from distutils import command
 from email import message
-import imp
+
 
 import json
-from logging import handlers
+from logging import exception, handlers
 from msilib.schema import Class
 from posixpath import dirname
+import this
 from threading import Thread
 from urllib import request
-from xml.etree.ElementInclude import include
+
 #from aiohttp import worker
 from async_timeout import asyncio
 from tornado.ioloop import IOLoop
@@ -23,7 +24,7 @@ import requests
 import pytchat
 from pytchat import LiveChat
 import json
-import twitchAPI
+
 import tornado.ioloop
 import tornado.web
 import websockets
@@ -133,7 +134,8 @@ class YT_Chat():
     
     chat = ""
     DB_Sqlite = ""
-    db_File_name = "viewers.sqlite"
+    db_File_name = "viewers_temp.sqlite"
+    viewers = ()
 
 
     def  __init__(self,vidID):
@@ -142,13 +144,13 @@ class YT_Chat():
         chat = self.chat.get()
         #self.chat.get().
 
-        #if(not path.exists(self.db_File_name)):
-        #   self.DB_Sqlite= sqlite3.connect(self.db_File_name)
-        #   self.DB_Sqlite.execute()
+        if(not path.exists(self.db_File_name)):
+           self.DB_Sqlite= sqlite3.connect(self.db_File_name)
+           self.DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	INTEGER NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT 'DATE(''now'')',	PRIMARY KEY(\"id\")               )")
 
 
-        #if(not self.DB_Sqlite):
-        #    self.DB_Sqlite = sqlite3.connect(self.db_File_name)
+        if(not self.DB_Sqlite):
+            self.DB_Sqlite = sqlite3.connect(self.db_File_name)
 
 
     def main_function(self):
@@ -162,9 +164,15 @@ class YT_Chat():
                     #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
                     if(str(jsonized["message"]).startswith("!") ):
                         command(jsonized["author"]["name"], jsonized["message"])
-                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":jsonized["author"]["name"],"zprava": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
-
+                    ws.send_ws_message(message=json.dumps({"platform":"yt","user":jsonized["author"]["name"],"userID":jsonized["author"]["channelId"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+                    #if(self.viewers[jsonized["author"]["channelId"]]):
+                     #   print("jkek")
+                    #self.DB_Sqlite.execute()
                     #ws.send_ws_message(message=c.json())
+                    #SQL Commands to use:
+                    #insert or ignore into viewers (ID,Name)VALUES ("UCQ5M_FnD7NpuLc3e5zjlBkg","ALT");
+                    #update or IGNORE viewers set Message_count = Message_count +1, Name = "+jsonized["author"]["name"]+", Stream_count = Stream_count+1 where ID = jsonized["author"]["channelId"]
+
         except:
             return("I failed")
 
@@ -187,11 +195,13 @@ if __name__ == "__main__":
     #t = Thread(target = start_server,args=())
     #t.start()
     settingFile = ""
-    with open("settings.json") as file :        
+    with open("env\settings.json") as set_file :        
         try:
-            settingFile = json.loads(file)
-        except:
+            #print(set_file.readlines())
+            settingFile = json.load(set_file)
+        except Exception as exc:
             print("Unexpected error occured, 'Chat Agregator' has been terminated")
+            print(exc)
             exit()    
 
     video_id = settingFile["ytVideo"]
@@ -209,5 +219,5 @@ if __name__ == "__main__":
             #ws.send_ws_message("prdel")
             #print(jsonized)
 
-    print("Sem bych se dostat neměl")
+    print("Err: How did I get here?!")
     t.join()
