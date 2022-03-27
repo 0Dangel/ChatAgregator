@@ -6,7 +6,7 @@ import time
 
 import json
 from logging import exception, handlers
-from msilib.schema import Class
+#from msilib.schema import Class
 from posixpath import dirname
 
 from threading import Thread
@@ -18,7 +18,7 @@ from tornado.ioloop import IOLoop
 import tornado
 import sqlite3
 from os import path
-
+import os
 
 
 import pytchat
@@ -59,8 +59,7 @@ class WebServer(tornado.web.Application):
         handlers = [
              (r"/", MainHandler),
              (r"/websocket",WSHandler,{"app":self}),
-             (r'/(.*.js)', StaticFileHandler, {'path': dirname(__file__)}),
-             (r'/auth',AuthHandler,)
+             (r'/(.*)', StaticFileHandler, {'path': dirname(__file__)})
              ]
         settings = {'debug':True}
         self.listen(8080)
@@ -213,11 +212,12 @@ def start_server():
 #worker.broadcast = Broadcast
  
 if __name__ == "__main__":
+    print(str(os.getcwd()))
     ws = WebServer()
     #t = Thread(target = start_server,args=())
     #t.start()
     settingFile = ""
-    with open("env\settings.json") as set_file :        
+    with open("./env/settings.json") as set_file :        
         try:
             #print(set_file.readlines())
             settingFile = json.load(set_file)
