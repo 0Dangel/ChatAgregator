@@ -103,7 +103,6 @@ class AuthHandler():
     def on_message(self,msg):
         print(msg)
 
-
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         #self.write("Hello, world")
@@ -157,23 +156,29 @@ class YT_Chat():
 
         if(not DB_Sqlite):
             DB_Sqlite = sqlite3.connect(db_File_name)
-
+        db_cursor = DB_Sqlite.cursor()
+            
 
         print("After Server")
        # try:
+        #SQL_Queue_insert = []
+        #SQL_Queue_update = []
         SQL_Queue = []
         SQL_Queue.append("BEGIN TRANSACTION;")
+        
         last_DB_update = time.time()
         while(True):
             data = self.chat.get()
             for c in data.sync_items():
                 jsonized =json.loads( c.json())
+                #print(jsonized)
                 #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
                 userID = jsonized["author"]["channelId"]
                 user_name = jsonized["author"]["name"]
-                if(str(jsonized["message"]).startswith("!") ):
-                    command(user_name, jsonized["message"])
-                ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+                #if(str(jsonized["message"]).startswith("!") ):
+                #    command(user_name, str(jsonized["message"]))
+
+                ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"user_own":jsonized["author"]["isChatOwner"],"user_spo":jsonized["author"]["isChatSponsor"],"user_mod":jsonized["author"]["isChatModerator"],"user_ver":jsonized["author"]["isVerified"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
                 #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
                 if(userID not in viewers):
                     viewers[userID] = True
@@ -183,6 +188,8 @@ class YT_Chat():
                     #TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
                 else:
                     SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")    
+            
+            
             if((time.time() - last_DB_update) >= 10 ):
                 for i in viewers:
                     SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
