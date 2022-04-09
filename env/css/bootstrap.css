@@ -637,6 +637,7 @@ progress {
 
 @media (min-width: 576px) {
   .container-sm, .container {
+
     max-width: 540px;
   }
 }
@@ -664,7 +665,11 @@ progress {
   --bs-gutter-x: 1.5rem;
   --bs-gutter-y: 0;
   display: flex;
+  font-size: medium;
   flex-wrap: wrap;
+  box-shadow:0 2px 3px 0 rgba(0, 0, 0, 0.4), 0 5px 8px 0 rgba(0, 0, 0, 0.2);
+  
+  color: #ffffff;
   margin-top: calc(-1 * var(--bs-gutter-y));
   margin-right: calc(-0.5 * var(--bs-gutter-x));
   margin-left: calc(-0.5 * var(--bs-gutter-x));
