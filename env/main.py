@@ -38,6 +38,10 @@ from tornado.web import StaticFileHandler
 from tornado.websocket import WebSocketHandler
 
 
+import socket, time
+
+
+
 
 tornado.ioloop.IOLoop.configure("tornado.platform.asyncio.AsyncIOLoop")
 io_loop = tornado.ioloop.IOLoop.current()
@@ -127,15 +131,67 @@ class WSHandler(WebSocketHandler):
         self.application.ws_clients.remove(self)
         print('Webserver: Websocket client closed. Connected clients:', len(self.application.ws_clients))
 
+class Twitch_chat():
+    sock = socket.socket()
+    def  __init__(self,channel):
+        
+        self.sock.connect(('irc.chat.twitch.tv',6667))
+        self.sock.send(f"PASS \n".encode('utf-8'))
+        self.sock.send(f"NICK \n".encode('utf-8'))
+
+        self.sock.send(f"JOIN {channel}\n".encode('utf-8'))
+        self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
+
+
+    def parseChat(resp):
+        resp = resp.rstrip().split('\r\n')
+        result = []
+        perms = []
+        i = 0
+        for line in resp:
+            
+            if "PRIVMSG" in line:
+                #print(line)
+                sub_result = []
+                sub_result[""]
+
+                line_split = line.split(";")
+                user = line_split[-1].split("user-type=")[1].split(':')[1].split('!')[0]
+                msg = line_split[-1].split(':', maxsplit=2)[2]
+                badges = line_split[1]
+                id = line_split[7].split("=")[1]
+
+                #perms["sub"] = permSplit[1].split(';')[0]
+                #perms["mod"] =  permSplit[2].split(';')[0]
+                #perms["sub_gift"] = permSplit[4].split(';')[0]
+
+                line = user + ": " + msg
+                print(line)
+                print(badges)
+                print("")
+                perms.append(sub_result)
+
+
+    def readChat(self):
+        resp = self.sock.recv(2048).decode('utf-8')
+        #print(resp)
+        if(resp.startswith("PING")):
+            self.sock.send("PONG\n".encode('utf-8'))
+        elif len(resp) > 0:
+            return self.parseChat(resp)
+
+        
+
 
 class YT_Chat():
     #So far only for YT Chat - TODO: Add a Twitch implementation too - Preferably using same way as PytChat uses for YouTube ?(Screw Twitch API)?
     
     chat = None   
+    TwtcChat= None
 
-
-    def  __init__(self,vidID):
+    def  __init__(self,vidID, twitchAcc):
         self.chat = pytchat.create(video_id=vidID)
+        self.TwtcChat = Twitch_chat(twitchAcc)
         #message(json.loads(self.chat.get().json()))
         chat = self.chat.get()
         #self.chat.get().
@@ -175,17 +231,17 @@ class YT_Chat():
                 #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
                 userID = jsonized["author"]["channelId"]
                 user_name = jsonized["author"]["name"]
-                #if(str(jsonized["message"]).startswith("!") ):
-                #    command(user_name, str(jsonized["message"]))
+                if(str(jsonized["message"]).startswith("!") ):
+                   command(user_name, str(jsonized["message"]))
 
                 ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"user_own":jsonized["author"]["isChatOwner"],"user_spo":jsonized["author"]["isChatSponsor"],"user_mod":jsonized["author"]["isChatModerator"],"user_ver":jsonized["author"]["isVerified"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
                 #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
                 if(userID not in viewers):
                     viewers[userID] = True
-                    #Might be good to implement some kind of multiplier for Members ? - TODO
+                 #   Might be good to implement some kind of multiplier for Members ? - TODO
                     SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
                     SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")   
-                    #TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
+                  #  TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
                 else:
                     SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")    
             
@@ -200,6 +256,11 @@ class YT_Chat():
                 SQL_Queue.clear()
                 SQL_Queue.append("BEGIN TRANSACTION;")
                 last_DB_update = time.time()
+
+        # while(True):
+        #     Twitch_chat.readChat(Twitch_chat)
+
+
 
         #except:
          #   return("I failed")
@@ -234,7 +295,7 @@ if __name__ == "__main__":
             exit()    
 
     video_id = settingFile["ytVideo"]
-    reader = YT_Chat(vidID= video_id)
+    reader = YT_Chat(vidID= video_id, twitchAcc= settingFile["TwitchAcc"])
 
     t = Thread(target=reader.main_function,daemon=True)
     t.start()

@@ -63,8 +63,8 @@ try {
     }
     if(data.user_mod)
     {
-        badgeImg+="mod "
-        //badgeImg = '<img src='+data.badgeURL +' alt="">';
+        //badgeImg+="mod "
+        badgeImg = '<img src="./img/mod.png"  alt="">';
         nameColor = "FFA800"
     }
     if(data.user_own)
@@ -77,7 +77,7 @@ try {
 
 
     
-    mainRow.innerHTML += "<div class='row' id="+countRows+"  style = 'background-color: rgba(0,0,0,0.5)'> <div class = 'col-sm-3' style = 'font-weight: bold; color:#"+nameColor+"'>"+badgeImg +"::" +data.user +'</div>'+ '<div class = "col-sm-9" style="color = #FFFFFF; font-weight: bolder">    ' + data.msg+'</div>  </div> <br>'   ; 
+    mainRow.innerHTML += "<div class='row' id="+countRows+"  style = 'background-color: rgba(0,0,0,0.5)'> <div class = 'col-sm-3' style = 'font-weight: bold; color:#"+nameColor+"'>"+badgeImg +"::" +data.user +'</div>'+ '<div class = "col-sm-9" style="color = #FFFFFF; font-weight: normal">    ' + data.msg+'</div>  </div> <br>'   ; 
     countRows +=1;
     if(countRows > 15)
     {       
