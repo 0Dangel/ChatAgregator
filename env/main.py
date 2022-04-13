@@ -120,17 +120,22 @@ class Twitch_chat():
             if "PRIVMSG" in line:
                 #print(line)
                 
-                #print("")
+                
                 line_split = line.split(';')
                 param_dict = {}
                
                 for param in line_split:
                     semi = param.split('=',1)
-                    param_dict[str(semi[0])] = semi[1]
+                    try:
+                        param_dict[str(semi[0])] = semi[1]
+                    except:
+                        pass
 
-                msg = param_dict["user-type"].split(':')[-1]
+                msg = param_dict["user-type"].split("PRIVMSG")[1].partition(":")[-1]
                 result.append({"userID":param_dict["user-id"],"user":param_dict["display-name"],"message":msg,"mod":bool(int(param_dict["mod"])),"sponsor":bool(int(param_dict["subscriber"])),"owner":param_dict["user-id"]==param_dict["room-id"],"platform":"twitch","verified":("verified" in param_dict["badges"])})
-
+                
+                # print(result)
+                # print("")
         return result
 
 
@@ -148,7 +153,7 @@ class Twitch_chat():
     def connect(self) -> None:
         try:
             self.sock.connect(('irc.chat.twitch.tv',6667))
-            self.sock.send(f"PASS {self.OAUTH}\n".encode('utf-8'))
+            self.sock.send(f"PASS {self.oauth}\n".encode('utf-8'))
             self.sock.send(f"NICK {self.nick}\n".encode('utf-8'))
             self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
             self.sock.send(f"JOIN {self.server}\n".encode('utf-8'))    

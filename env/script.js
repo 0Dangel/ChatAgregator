@@ -52,8 +52,8 @@ try {JSON.parse(message.data).forEach(element => {
 
     if(element.sponsor)
     {
-        if(badgeUrl != null){
-            badgeImg += '<img src='+data.badgeUrl +' alt="">';}
+        if(element.badgeUrl != null){
+            badgeImg += '<img src='+element.badgeUrl +' alt="">';}
         else{
             badgeImg += 'sponsor';}
         nameColor = "00AA00";
@@ -74,10 +74,15 @@ try {JSON.parse(message.data).forEach(element => {
         badgeImg+="owner "
         //badgeImg = '<img src='+data.badgeURL +' alt="">';
     }
-    
+    try{
     mainRow.innerHTML += "<div class='row' id="+countRows+"  style = 'background-color: rgba(0,0,0,0.5)'> <div class = 'col-sm-3' style = 'font-weight: bold; color:#"+nameColor+"'>"+badgeImg +"::" +element.user +'</div>'+ '<div class = "col-sm-9" style="color = #FFFFFF; font-weight: normal">    ' + element.message+'</div>  </div> <br>'   ; 
+    }
+    catch (error)
+    {
+        mainRow.innerHTML += "<div class = 'row' style = 'background-color: rgba(0,0,0,0.5)'>  I failed hard af </div><br>"
+    }
     countRows +=1;
-    if(countRows > 15)
+    if(countRows > 20)
     {       
         countRows = 0;
         deletingRows = true;        
@@ -95,7 +100,7 @@ try {JSON.parse(message.data).forEach(element => {
 });
     } catch (e) {
         //data = message.data
-	data = "";
+        mainRow.innerHTML += "<div class = 'row' style = 'background-color: rgba(0,0,0,0.5)'>  I failed hard af: "+e+" </div><br>"
     }
 
 
