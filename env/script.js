@@ -25,8 +25,8 @@ function onBodyLoad() {
 function onSocketMessage(message) {
         console.log("WS message: ", message)
 
-try {
-    data = JSON.parse(message.data);
+try {JSON.parse(message.data).forEach(element => {
+    //data = JSON.parse(message.data);
 
     //comments.push(message.data);
     //if(comments.lenght > 20)
@@ -39,7 +39,7 @@ try {
 
  //style = 'background-color: #FAA800'
     nameColor = "FFFFFF"
-    switch(data.platform)
+    switch(element.platform)
     {
         case "yt":
             nameColor = "AA0000";
@@ -50,52 +50,49 @@ try {
     }
     badgeImg=""
 
-    if(data.user_spo)
+    if(element.sponsor)
     {
-        //badgeImg+="sponsor "
-        badgeImg += '<img src='+data.badgeUrl +' alt="">';
-        nameColor = "00AA00"
+        if(badgeUrl != null){
+            badgeImg += '<img src='+data.badgeUrl +' alt="">';}
+        else{
+            badgeImg += 'sponsor';}
+        nameColor = "00AA00";
     }
-    if(data.user_ver)
+    if(element.verified)
     {
         badgeImg+="verified "
         //badgeImg = '<img src='+data.badgeURL +' alt="">';
     }
-    if(data.user_mod)
+    if(element.mod)
     {
         //badgeImg+="mod "
         badgeImg = '<img src="./img/mod.png"  alt="">';
         nameColor = "FFA800"
     }
-    if(data.user_own)
+    if(element.owner)
     {
         badgeImg+="owner "
         //badgeImg = '<img src='+data.badgeURL +' alt="">';
     }
-
-
-
-
     
-    mainRow.innerHTML += "<div class='row' id="+countRows+"  style = 'background-color: rgba(0,0,0,0.5)'> <div class = 'col-sm-3' style = 'font-weight: bold; color:#"+nameColor+"'>"+badgeImg +"::" +data.user +'</div>'+ '<div class = "col-sm-9" style="color = #FFFFFF; font-weight: normal">    ' + data.msg+'</div>  </div> <br>'   ; 
+    mainRow.innerHTML += "<div class='row' id="+countRows+"  style = 'background-color: rgba(0,0,0,0.5)'> <div class = 'col-sm-3' style = 'font-weight: bold; color:#"+nameColor+"'>"+badgeImg +"::" +element.user +'</div>'+ '<div class = "col-sm-9" style="color = #FFFFFF; font-weight: normal">    ' + element.message+'</div>  </div> <br>'   ; 
     countRows +=1;
     if(countRows > 15)
     {       
         countRows = 0;
-        deletingRows = true;
-        
+        deletingRows = true;        
     }
 
     if(deletingRows)
     {
         mainRow.firstElementChild.remove();
         mainRow.firstElementChild.remove();
-
     }
     
     //document.write(data.user + ":" + data.msg+"<br>");
     window.scrollTo(0, window.innerHeight);
-
+   
+});
     } catch (e) {
         //data = message.data
 	data = "";

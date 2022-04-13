@@ -1,2 +1,3 @@
 viewers_temp.sqlite
 secret
+env/parser.py

@@ -1,7 +1,8 @@
-from ast import arg
-from datetime import datetime
-from distutils import command
-from email import message
+from array import array
+from asyncio.windows_events import NULL
+from ctypes import WinError
+from multiprocessing.connection import wait
+from queue import Empty
 import time
 
 import json
@@ -10,8 +11,6 @@ from logging import exception, handlers
 from posixpath import dirname
 
 from threading import Thread
-from urllib import request
-
 #from aiohttp import worker
 from async_timeout import asyncio
 from tornado.ioloop import IOLoop
@@ -19,28 +18,18 @@ import tornado
 import sqlite3
 from os import path
 import os
-
-
 import pytchat
-from pytchat import LiveChat
 import json
-
 import tornado.ioloop
 import tornado.web
-import websockets
 import asyncio
-
-
 from os.path import dirname
-
 from tornado.web import StaticFileHandler
-
 from tornado.websocket import WebSocketHandler
-
-
 import socket, time
-
-
+import asyncio
+import multiprocessing as mp 
+from multiprocessing import Queue
 
 
 tornado.ioloop.IOLoop.configure("tornado.platform.asyncio.AsyncIOLoop")
@@ -68,40 +57,14 @@ class WebServer(tornado.web.Application):
         settings = {'debug':True}
         self.listen(8080)
         tornado.web.Application.__init__(self,handlers, **settings)
-        
-
-
-
-
-        
+                
     def send_ws_message(self, message):
         for client in self.ws_clients:
-            try:
-                iol.spawn_callback(client.write_message, message)
-            except:
-                iol.spawn_callback(client.write_message, json.dumps(message))
-
-        #for client in self.ws_clients:
-         #   try:
-          #      self.iol.spawn_callback(client.write_message, message)
-           # except:
-            #    self.iol.spawn_callback(client.write_message, json.dumps(message))
-        
-        #tohle.write_message("message")
-        #print("yes")
-        print(len(self.ws_clients))
+            iol.spawn_callback(client.write_message, message)
 
 
+        #print(len(self.ws_clients))
 
-#def bcint(message):
-    #print("-------")
- #   print(len(ws_clients))
-  #  for client in ws_clients:
-   #     client.write_message(message)
- #       print(message)
-#
-#def Broadcast(message):
-#    io_loop.asyncio_loop.call_soon_threadsafe(bcint,message)
 
 class AuthHandler():
     def on_message(self,msg):
@@ -121,8 +84,6 @@ class WSHandler(WebSocketHandler):
     def open(self):
         print('Webserver: Websocket opened.')
         self.write_message('Server ready.')
-        #self.app.send_ws_message(message="This doesn't work")
-        #self.application.ws_clients.append(self)
 
     def on_message(self, msg):
         print('Webserver: Received WS message:', msg)
@@ -133,140 +94,207 @@ class WSHandler(WebSocketHandler):
 
 class Twitch_chat():
     sock = socket.socket()
-    def  __init__(self,channel):
+    server = ""
+    errCount = 0
+
+
+    def  __init__(self,channel : str):
         
-        self.sock.connect(('irc.chat.twitch.tv',6667))
-        self.sock.send(f"PASS \n".encode('utf-8'))
-        self.sock.send(f"NICK \n".encode('utf-8'))
+        
+        self.server = channel
+        self.connect()
+        # self.sock.connect(('irc.chat.twitch.tv',6667))
+        # self.sock.send(f"PASS oauth:d5kk5jf7fzeuz6fux5ykf9os9azveu\n".encode('utf-8'))
+        # self.sock.send(f"NICK 0dangel\n".encode('utf-8'))
+        # self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
+        # self.sock.send(f"JOIN {channel}\n".encode('utf-8'))    
+        # #self.sock.setblocking(False)
+        # #self.sock.settimeout(0.1)
+        # print("Nastaveno:" , channel)
 
-        self.sock.send(f"JOIN {channel}\n".encode('utf-8'))
-        self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
 
-
-    def parseChat(resp):
+    def parseChat(self,resp:str) -> array:
         resp = resp.rstrip().split('\r\n')
         result = []
-        perms = []
-        i = 0
-        for line in resp:
-            
+        for line in resp:            
             if "PRIVMSG" in line:
                 #print(line)
-                sub_result = []
-                sub_result[""]
+                
+                #print("")
+                line_split = line.split(';')
+                param_dict = {}
+               
+                for param in line_split:
+                    semi = param.split('=',1)
+                    param_dict[str(semi[0])] = semi[1]
 
-                line_split = line.split(";")
-                user = line_split[-1].split("user-type=")[1].split(':')[1].split('!')[0]
-                msg = line_split[-1].split(':', maxsplit=2)[2]
-                badges = line_split[1]
-                id = line_split[7].split("=")[1]
+                msg = param_dict["user-type"].split(':')[-1]
+                result.append({"userID":param_dict["user-id"],"user":param_dict["display-name"],"message":msg,"mod":bool(int(param_dict["mod"])),"sponsor":bool(int(param_dict["subscriber"])),"owner":param_dict["user-id"]==param_dict["room-id"],"platform":"twitch","verified":("verified" in param_dict["badges"])})
 
-                #perms["sub"] = permSplit[1].split(';')[0]
-                #perms["mod"] =  permSplit[2].split(';')[0]
-                #perms["sub_gift"] = permSplit[4].split(';')[0]
-
-                line = user + ": " + msg
-                print(line)
-                print(badges)
-                print("")
-                perms.append(sub_result)
+        return result
 
 
-    def readChat(self):
-        resp = self.sock.recv(2048).decode('utf-8')
-        #print(resp)
-        if(resp.startswith("PING")):
-            self.sock.send("PONG\n".encode('utf-8'))
-        elif len(resp) > 0:
-            return self.parseChat(resp)
+    def readChat(self) -> array:
+            #print(self.server)
+        #try:
+            resp = self.sock.recv(2048).decode('utf-8')
+            #print(resp)
+            if(resp.startswith("PING")):
+                self.sock.send("PONG\n".encode('utf-8'))
+            elif len(resp) > 0:
+                if(len is not None):
+                    return self.parseChat(resp)
 
+    def connect(self) -> None:
+        try:
+            self.sock.connect(('irc.chat.twitch.tv',6667))
+            self.sock.send(f"PASS {self.OAUTH}\n".encode('utf-8'))
+            self.sock.send(f"NICK {self.nick}\n".encode('utf-8'))
+            self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
+            self.sock.send(f"JOIN {self.server}\n".encode('utf-8'))    
+            self.errCount =0
+        except ConnectionResetError:
+            time.sleep(pow(2,self.errCount))
+            print("Connection refused by server - probabbly 'spam' reasons... Retry in: 2^", self.errCount," seconds")            
+            if(self.errCount < 5):
+                self.errCount += 1
+
+
+    def main(self,queue : Queue) -> None:
+        self.connect()
+                       
+        #self.sock.setblocking(False)
+        #self.sock.settimeout(0.1)
+        while(True):
+            queue.put(self.readChat())
         
+
+
+       
 
 
 class YT_Chat():
     #So far only for YT Chat - TODO: Add a Twitch implementation too - Preferably using same way as PytChat uses for YouTube ?(Screw Twitch API)?
     
-    chat = None   
-    TwtcChat= None
+    TwitchChat= None
+    DB_Sqlite = None
+    viewers = {}
+    TwitchQueue = None
+    
 
-    def  __init__(self,vidID, twitchAcc):
+    def  __init__(self,vidID:str, twitchAcc:str)-> None:
         self.chat = pytchat.create(video_id=vidID)
-        self.TwtcChat = Twitch_chat(twitchAcc)
+        self.TwitchQueue= mp.Queue()
+        print(self.TwitchQueue)
+        self.TwitchChat = mp.Process(target = Twitch_chat.main, args=(Twitch_chat(twitchAcc),self.TwitchQueue))
         #message(json.loads(self.chat.get().json()))
-        chat = self.chat.get()
-        #self.chat.get().
-
         
+        #self.chat.get().
+        
+        db_File_name = "viewers_temp.sqlite"
+        
+
+        if(not path.exists(db_File_name)):
+           self.DB_Sqlite= sqlite3.connect(db_File_name)
+           self.DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	STRING NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT CURRENT_TIMESTAMP,	PRIMARY KEY(\"id\")               )")
+
+
+        if(not self.DB_Sqlite):
+            self.DB_Sqlite = sqlite3.connect(db_File_name)
+        db_cursor = self.DB_Sqlite.cursor()
+
+    def database(self,command:str, data:array)->None:
+        
+        return
+
+    def chat_command(user: str,message: str) -> None:
+        return
 
 
     def main_function(self):
-
-        DB_Sqlite = None
-        db_File_name = "viewers_temp.sqlite"
-        viewers = {}
-
-        if(not path.exists(db_File_name)):
-           DB_Sqlite= sqlite3.connect(db_File_name)
-           DB_Sqlite.execute("CREATE TABLE \"viewers\" (	\"id\"	STRING NOT NULL,	\"Name\"	TEXT,	\"Points\"	INTEGER DEFAULT 0,	\"Stream_count\"	INTEGER DEFAULT 0,	\"Message_count\"	INTEGER DEFAULT 0,	\"Donos\"	INTEGER DEFAULT 0,	\"Type\"	INTEGER,	\"FirstMessage_date\"	BLOB DEFAULT CURRENT_TIMESTAMP,	PRIMARY KEY(\"id\")               )")
-
-
-        if(not DB_Sqlite):
-            DB_Sqlite = sqlite3.connect(db_File_name)
-        db_cursor = DB_Sqlite.cursor()
-            
-
+       
         print("After Server")
+        self.TwitchChat.start()
+        
+        while(True):
+            try:
+                result=self.TwitchQueue.get_nowait()
+                ws.send_ws_message(message=json.dumps(result))
+            except Empty:
+                pass
+            #result = self.TwtcChat.readChat()
+            #print(time.time()-now,"   Twitch Fetch")
+
+            data = self.chat.get()
+            # print(time.time()-now,"   Youtube Fetch")
+
+            # print(time.time()-now)
+            ytArr = []
+            if(data != None and data != NULL):
+                for c in data.sync_items() :
+                    jsonized =json.loads( c.json())
+                    #print(jsonized)
+                    #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
+                    userID = jsonized["author"]["channelId"]
+                    user_name = jsonized["author"]["name"]
+                    ytArr.append({"platform":"yt","user":user_name,"userID":userID,"owner":jsonized["author"]["isChatOwner"],"sponsor":jsonized["author"]["isChatSponsor"],"mod":jsonized["author"]["isChatModerator"],"verified":jsonized["author"]["isVerified"],"message": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]})
+            if(len(ytArr)>0):    
+                ws.send_ws_message(message=json.dumps(ytArr))
+            # print(time.time()-now)
+            #print("")
+            now = time.time()
+        return
+
        # try:
         #SQL_Queue_insert = []
         #SQL_Queue_update = []
-        SQL_Queue = []
-        SQL_Queue.append("BEGIN TRANSACTION;")
+        # SQL_Queue = []
+        # SQL_Queue.append("BEGIN TRANSACTION;")
         
-        last_DB_update = time.time()
-        while(True):
-            data = self.chat.get()
-            for c in data.sync_items():
-                jsonized =json.loads( c.json())
-                #print(jsonized)
-                #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
-                userID = jsonized["author"]["channelId"]
-                user_name = jsonized["author"]["name"]
-                if(str(jsonized["message"]).startswith("!") ):
-                   command(user_name, str(jsonized["message"]))
-
-                ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"user_own":jsonized["author"]["isChatOwner"],"user_spo":jsonized["author"]["isChatSponsor"],"user_mod":jsonized["author"]["isChatModerator"],"user_ver":jsonized["author"]["isVerified"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
-                #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
-                if(userID not in viewers):
-                    viewers[userID] = True
-                 #   Might be good to implement some kind of multiplier for Members ? - TODO
-                    SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
-                    SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")   
-                  #  TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
-                else:
-                    SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")    
-            
-            
-            if((time.time() - last_DB_update) >= 10 ):
-                for i in viewers:
-                    SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
-                SQL_Queue.append("COMMIT;")
-
-                if(len(SQL_Queue) > 2):
-                    DB_Sqlite.executescript(" ".join(SQL_Queue))
-                SQL_Queue.clear()
-                SQL_Queue.append("BEGIN TRANSACTION;")
-                last_DB_update = time.time()
-
+        # last_DB_update = time.time()
         # while(True):
-        #     Twitch_chat.readChat(Twitch_chat)
+        #     data = self.chat.get()
+        #     for c in data.sync_items():
+        #         jsonized =json.loads( c.json())
+        #         #print(jsonized)
+        #         #print(jsonized["author"]["name"] + ":   " + jsonized["message"])
+        #         userID = jsonized["author"]["channelId"]
+        #         user_name = jsonized["author"]["name"]
+        #         if(str(jsonized["message"]).startswith("!") ):
+        #            chat_command(user_name, str(jsonized["message"]))
+
+        #         ws.send_ws_message(message=json.dumps({"platform":"yt","user":user_name,"userID":userID,"user_own":jsonized["author"]["isChatOwner"],"user_spo":jsonized["author"]["isChatSponsor"],"user_mod":jsonized["author"]["isChatModerator"],"user_ver":jsonized["author"]["isVerified"],"msg": jsonized["message"],"amount":jsonized["amountValue"],"currency": jsonized["currency"], "image":jsonized["author"]["imageUrl"].replace("yt4.ggpht","yt3.ggpht"),"badgeUrl":jsonized["author"]["badgeUrl"]}))
+        #         #Websocket rendering is to be done using JScript -> one of many reasons why we actually host local webserver so that the visual aspects can be "easily modified using JScript and such... Screw PyQt5"
+        #         if(userID not in self.viewers):
+        #             self.viewers[userID] = True
+        #          #   Might be good to implement some kind of multiplier for Members ? - TODO
+        #             SQL_Queue.append("insert or ignore into viewers (ID,Name)VALUES (\""+userID+"\",\""+user_name+"\");")
+        #             SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Stream_count = Stream_count+1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")   
+        #           #  TODO: Change how this works - use "ExecuteMany with a parameter rather than saving the whole damn commands"
+        #         else:
+        #             SQL_Queue.append("update or IGNORE viewers set Message_count = Message_count +1, Donos = Donos + "+str(jsonized["amountValue"])+"  where ID = \""+userID+"\";")    
+            
+            
+        #     if((time.time() - last_DB_update) >= 10 ):
+        #         for i in self.viewers:
+        #             SQL_Queue.append("update or IGNORE viewers set Points = Points + 100 where ID = \""+i+"\";")
+        #         SQL_Queue.append("COMMIT;")
+
+        #         if(len(SQL_Queue) > 2):
+        #             self.DB_Sqlite.executescript(" ".join(SQL_Queue))
+        #         SQL_Queue.clear()
+        #         SQL_Queue.append("BEGIN TRANSACTION;")
+        #         last_DB_update = time.time()
+
+        # # while(True):
+        # #     Twitch_chat.readChat(Twitch_chat)
 
 
 
         #except:
          #   return("I failed")
 
-    def command(user: str,message: str) -> None:
-        return
+ 
 
 
 
