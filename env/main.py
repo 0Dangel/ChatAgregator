@@ -104,8 +104,8 @@ class Twitch_chat():
         self.server = channel
         self.connect()
         # self.sock.connect(('irc.chat.twitch.tv',6667))
-        # self.sock.send(f"PASS oauth:d5kk5jf7fzeuz6fux5ykf9os9azveu\n".encode('utf-8'))
-        # self.sock.send(f"NICK 0dangel\n".encode('utf-8'))
+        # self.sock.send(f"PASS oauth:\n".encode('utf-8'))
+        # self.sock.send(f"NICK \n".encode('utf-8'))
         # self.sock.send(f"CAP REQ : twitch.tv/tags\n".encode('utf-8'))
         # self.sock.send(f"JOIN {channel}\n".encode('utf-8'))    
         # #self.sock.setblocking(False)
